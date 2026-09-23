@@ -21,7 +21,8 @@ from pathlib import Path
 # top-level directory when there is one).
 METADATA_FILENAMES = ("metadata.yaml", "metadata.yml")
 
-REQUIRED_METADATA_FIELDS = ("name", "version", "desc")
+# Mirrors AstrBot's own PLUGIN_METADATA_REQUIRED_FIELDS (astrbot/core/star/updater.py).
+REQUIRED_METADATA_FIELDS = ("name", "desc", "version", "author")
 
 
 def _fail(message: str) -> None:
