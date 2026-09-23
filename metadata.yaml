@@ -2,7 +2,7 @@ name: astrbot_plugin_sub2api_rate
 display_name: Sub2API 倍率查询
 short_desc: 查询 Sub2API 各分组模型倍率、最低倍率与渠道健康状态，可生成渠道状态图
 desc: 通过 Sub2API 管理员 API Key（x-api-key）或面板 JWT 读取启用分组的模型倍率，并展示渠道监控 V2 的渠道健康状态与缓存率；支持把监控数据渲染成渠道状态图，结果由 AstrBot 发送到 QQ。
-version: 1.0.0
+version: 1.0.1
 author: ziyue67
 repo: https://github.com/ziyue67/astrbot_plugin_sub2api_rate
 astrbot_version: ">=4.10.4"
