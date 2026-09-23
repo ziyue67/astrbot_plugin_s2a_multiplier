@@ -1,0 +1,88 @@
+name: Release
+
+# Two entry points:
+#   - pushing a v* tag publishes that tag (the normal path)
+#   - workflow_dispatch re-publishes an existing tag, e.g. to repair a broken
+#     or missing archive without cutting a new version
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要（重新）发布的 tag，例如 v1.0.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build installable archive
+        id: build
+        run: |
+          python .github/scripts/build_plugin_zip.py \
+            --tag "$TAG" \
+            --output-dir dist \
+            --github-output "$GITHUB_OUTPUT"
+
+      # The archive must carry a single top-level directory: AstrBot's CLI
+      # installer moves namelist[0] into data/plugins/, and a flat archive
+      # resolves to a single file. Fail here rather than ship a broken package.
+      - name: Validate archive structure
+        run: python .github/scripts/validate_plugin_zip.py "dist/${{ steps.build.outputs.archive_name }}"
+
+      - name: Check metadata version matches the tag
+        run: |
+          expected="${TAG#v}"
+          actual="${{ steps.build.outputs.version }}"
+          if [ "$expected" != "$actual" ]; then
+            echo "::error::metadata.yaml 的 version 是 $actual，但 tag 是 $TAG。请先把 metadata.yaml 改成 $expected 再打 tag。"
+            exit 1
+          fi
+          echo "版本一致：$actual"
+
+      - name: Upload archive as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.archive_name }}
+          path: dist/${{ steps.build.outputs.archive_name }}
+          if-no-files-found: error
+
+      - name: Publish or repair the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          archive="dist/${{ steps.build.outputs.archive_name }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG 已存在，仅替换安装包"
+            gh release upload "$TAG" "$archive" --clobber
+          else
+            echo "创建新 Release $TAG"
+            gh release create "$TAG" "$archive" \
+              --title "$TAG" \
+              --generate-notes \
+              --verify-tag
+          fi
+          gh release view "$TAG" --json url,assets --jq '"Release: " + .url, (.assets[] | "  asset: " + .name)'

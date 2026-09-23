@@ -4,7 +4,7 @@
 
 ![AstrBot](https://img.shields.io/badge/AstrBot-%3E%3D%204.10.4-blue)
 
-![Version](https://img.shields.io/badge/version-1.2.0-green)
+![Version](https://img.shields.io/badge/version-1.0.0-green)
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 
@@ -47,7 +47,10 @@
 
 方式一（推荐）：在 AstrBot 插件市场搜索 `sub2api` 安装。
 
-方式二：手动放进插件目录。
+方式二：从 [Releases](https://github.com/ziyue67/astrbot_plugin_sub2api_rate/releases) 下载 `astrbot_plugin_sub2api_rate-vX.Y.Z.zip`，在 WebUI 插件页上传安装。
+压缩包带单一顶层目录，WebUI 和 `astrbot` CLI 两条安装路径都能识别。
+
+方式三：手动放进插件目录。
 
 ```bash
 cd AstrBot/data/plugins
