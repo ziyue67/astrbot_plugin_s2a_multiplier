@@ -49,8 +49,8 @@
 
 ```bash
 cd AstrBot/data/plugins
-git clone https://github.com/ziyue67/astrbot_plugin_s2a_multiplier.git
-pip install -r astrbot_plugin_s2a_multiplier/requirements.txt
+git clone https://github.com/ziyue67/astrbot_plugin_sub2api_rate.git
+pip install -r astrbot_plugin_sub2api_rate/requirements.txt
 ```
 
 然后重启 AstrBot，在 WebUI → 插件 中确认插件已加载。
@@ -138,7 +138,7 @@ pip install -r astrbot_plugin_s2a_multiplier/requirements.txt
 
 色块条长度固定为 30 格，没有数据的格子会保持暗色，所以「刚上线还没流量」和「一直在报错」一眼就能区分开。
 
-图片写入系统临时目录（`%TEMP%/astrbot_s2a_multiplier/`），每个实例复用同一个文件名，不会无限增长。单次命令最多生成 5 张。
+图片写入系统临时目录（`%TEMP%/astrbot_sub2api_rate/`），每个实例复用同一个文件名，不会无限增长。单次命令最多生成 5 张。
 
 如果系统里找不到中文字体，插件**不会**硬渲染出一堆方框，而是直接回复一条提示，让你改用 `/倍率` 看文字版。
 

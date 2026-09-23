@@ -48,7 +48,7 @@ except ImportError:  # Support loaders that execute main.py as a top-level modul
 
 
 MAX_IMAGES_PER_COMMAND = 5
-IMAGE_DIR_NAME = "astrbot_s2a_multiplier"
+IMAGE_DIR_NAME = "astrbot_sub2api_rate"
 
 
 @dataclass(frozen=True)
