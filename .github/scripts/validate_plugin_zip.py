@@ -6,7 +6,7 @@ CLI installer imposes. Run it locally before uploading, and in CI before
 attaching the archive to a release.
 
 Usage:
-    python .github/scripts/validate_plugin_zip.py dist/astrbot_plugin_sub2api_multiplier-v1.0.3.zip
+    python .github/scripts/validate_plugin_zip.py dist/astrbot_plugin_sub2api_rate-v1.0.2.zip
 """
 
 from __future__ import annotations
