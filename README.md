@@ -45,11 +45,13 @@
 
 ## 安装
 
-> 本插件**尚未上架 AstrBot 插件市场**，在市场里搜不到，请用下面两种方式安装。
+方式一：在 AstrBot 插件市场搜索 `sub2api` 安装。
 
-方式一（推荐）：从 [Releases](https://github.com/ziyue67/astrbot_plugin_sub2api_rate/releases) 下载 `astrbot_plugin_sub2api_rate-vX.Y.Z.zip`，在 AstrBot WebUI → 插件页上传安装。
+> 插件已提交至 AstrBot 插件市场，正在审核中（VirusTotal 与安全检查）。审核通过前若搜不到，请用下面两种方式。
 
-方式二：克隆到插件目录。
+方式二（推荐）：从 [Releases](https://github.com/ziyue67/astrbot_plugin_sub2api_rate/releases) 下载 `astrbot_plugin_sub2api_rate-vX.Y.Z.zip`，在 AstrBot WebUI → 插件页上传安装。
+
+方式三：克隆到插件目录。
 
 ```bash
 cd AstrBot/data/plugins
@@ -96,7 +98,7 @@ Release 里的压缩包带**单一顶层目录** `astrbot_plugin_sub2api_rate/`�
       "__template_key": "sub2api_instance",
       "name": "主站",
       "base_url": "https://sub2api.example.com",
-      "admin_api_key": "admin-xxxxxxxxxxxxxxxx",
+      "admin_api_key": "<管理员 API Key，以 admin- 开头>",
       "panel_jwt": ""
     }
   ],
