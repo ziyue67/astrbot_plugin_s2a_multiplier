@@ -45,12 +45,11 @@
 
 ## 安装
 
-方式一（推荐）：在 AstrBot 插件市场搜索 `sub2api` 安装。
+> 本插件**尚未上架 AstrBot 插件市场**，在市场里搜不到，请用下面两种方式安装。
 
-方式二：从 [Releases](https://github.com/ziyue67/astrbot_plugin_sub2api_rate/releases) 下载 `astrbot_plugin_sub2api_rate-vX.Y.Z.zip`，在 WebUI 插件页上传安装。
-压缩包带单一顶层目录，WebUI 和 `astrbot` CLI 两条安装路径都能识别。
+方式一（推荐）：从 [Releases](https://github.com/ziyue67/astrbot_plugin_sub2api_rate/releases) 下载 `astrbot_plugin_sub2api_rate-vX.Y.Z.zip`，在 AstrBot WebUI → 插件页上传安装。
 
-方式三：手动放进插件目录。
+方式二：克隆到插件目录。
 
 ```bash
 cd AstrBot/data/plugins
@@ -59,6 +58,10 @@ pip install -r astrbot_plugin_sub2api_rate/requirements.txt
 ```
 
 然后重启 AstrBot，在 WebUI → 插件 中确认插件已加载。
+
+### 安装包结构
+
+Release 里的压缩包带**单一顶层目录** `astrbot_plugin_sub2api_rate/`。手动解压时请保持这个结构——把文件直接摊在 `data/plugins/` 下会导致插件加载失败。CI 会在发布前校验这一点。
 
 ## 配置
 
