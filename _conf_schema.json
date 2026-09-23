@@ -23,7 +23,14 @@
           "admin_api_key": {
             "description": "管理员 API Key",
             "type": "text",
-            "hint": "只保存到插件配置中，用于 x-api-key 请求头，不会发送到 QQ。",
+            "hint": "Sub2API 后台「系统设置 → 管理员 API Key」生成，以 admin- 开头。与面板 JWT 至少填一个。",
+            "default": "",
+            "secret": true
+          },
+          "panel_jwt": {
+            "description": "面板 JWT（可选）",
+            "type": "text",
+            "hint": "浏览器登录后台后，F12 → Application → Local Storage 里的 auth_token。填了会优先用它生成渠道状态图。注意不是 sk- 开头的网关 Key。",
             "default": "",
             "secret": true
           }
@@ -64,5 +71,11 @@
     "type": "string",
     "hint": "可选：90m、24h、7d、30d。",
     "default": "24h"
+  },
+  "image_enabled": {
+    "description": "允许生成渠道状态图",
+    "type": "bool",
+    "hint": "开启后 /渠道图 会把渠道监控数据渲染成一张 PNG。需要安装 Pillow 和系统中文字体。",
+    "default": true
   }
 }

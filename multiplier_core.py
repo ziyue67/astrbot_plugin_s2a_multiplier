@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 from urllib.parse import urlencode, urlsplit
 
 import httpx
-
 
 GROUPS_PATH = "/api/v1/admin/groups/all"
 MONITOR_V2_PATH = "/api/v1/admin/channel-monitor-v2/matrix"
@@ -23,13 +23,24 @@ class Sub2APIError(RuntimeError):
 
 @dataclass(frozen=True)
 class Sub2APIInstanceConfig:
+    """One Sub2API site.
+
+    Either credential can drive the admin API: an admin API key (`x-api-key`)
+    or a panel JWT (`Authorization: Bearer`). At least one should be present.
+    """
+
     name: str
     base_url: str
-    admin_api_key: str
+    admin_api_key: str = ""
+    panel_jwt: str = ""
 
     @property
     def cache_key(self) -> str:
         return f"{self.name}\x00{self.base_url}"
+
+    @property
+    def has_credential(self) -> bool:
+        return bool(self.admin_api_key or self.panel_jwt)
 
 
 @dataclass(frozen=True)
@@ -47,6 +58,20 @@ class Sub2APIGroupRate:
 
 
 @dataclass(frozen=True)
+class Sub2APIGroupBucket:
+    """One time bucket from the Channel Monitor V2 matrix."""
+
+    bucket_start: str
+    request_count: int = 0
+    error_rate: float = 0.0
+    overall: str = "unknown"
+
+    @property
+    def is_empty(self) -> bool:
+        return self.request_count <= 0
+
+
+@dataclass(frozen=True)
 class Sub2APIGroupHealth:
     group_id: str
     group_name: str
@@ -56,6 +81,21 @@ class Sub2APIGroupHealth:
     cache_score: float | None
     cache_rate_denominator: int
     minimum_sample: int = DEFAULT_CACHE_MINIMUM_SAMPLE
+    request_count: int = 0
+    error_rate: float | None = None
+    rpm: float = 0.0
+    ttft_avg_ms: float | None = None
+    ttft_p95_ms: float | None = None
+    buckets: tuple[Sub2APIGroupBucket, ...] = ()
+
+    @property
+    def success_rate(self) -> float | None:
+        """Return the success ratio in 0..1, or None when unavailable."""
+
+        if self.error_rate is None:
+            return None
+        clamped = min(max(self.error_rate, 0.0), 1.0)
+        return 1.0 - clamped
 
 
 @dataclass(frozen=True)
@@ -93,6 +133,30 @@ def build_monitor_url(base_url: str, monitor_range: str = "24h") -> str:
     return f"{value}{MONITOR_V2_PATH}?{query}"
 
 
+def build_auth_headers(
+    instance: Sub2APIInstanceConfig,
+    *,
+    prefer_panel: bool = False,
+) -> dict[str, str]:
+    """Pick the credential to use for an admin API call.
+
+    Sub2API's admin middleware accepts either `x-api-key: <admin key>` or
+    `Authorization: Bearer <panel JWT>`. We honour `prefer_panel` when the
+    matching credential exists, then fall back to the other one so a site
+    configured with only one of the two still works.
+    """
+
+    headers = {"Accept": "application/json"}
+    for use_panel in (True, False) if prefer_panel else (False, True):
+        if use_panel and instance.panel_jwt:
+            headers["Authorization"] = f"Bearer {instance.panel_jwt}"
+            return headers
+        if not use_panel and instance.admin_api_key:
+            headers["x-api-key"] = instance.admin_api_key
+            return headers
+    return headers
+
+
 async def fetch_groups(
     instance: Sub2APIInstanceConfig,
     *,
@@ -103,9 +167,11 @@ async def fetch_groups(
     """Fetch and normalize group multipliers from one Sub2API instance."""
 
     url = build_groups_url(instance.base_url, include_inactive)
-    headers = {"x-api-key": instance.admin_api_key, "Accept": "application/json"}
+    headers = build_auth_headers(instance)
     owns_client = client is None
-    request_client = client or httpx.AsyncClient(follow_redirects=True, timeout=timeout_seconds)
+    request_client = client or httpx.AsyncClient(
+        follow_redirects=True, timeout=timeout_seconds
+    )
 
     try:
         try:
@@ -134,7 +200,9 @@ async def fetch_groups(
         normalized: list[Sub2APIGroupRate] = []
         for raw_group in raw_groups:
             group = _normalize_group(raw_group)
-            if group is not None and (include_inactive or _is_active_status(group.status)):
+            if group is not None and (
+                include_inactive or _is_active_status(group.status)
+            ):
                 normalized.append(group)
         return tuple(normalized)
     finally:
@@ -152,9 +220,11 @@ async def fetch_group_health(
     """Fetch and normalize Channel Monitor V2 group health data."""
 
     url = build_monitor_url(instance.base_url, monitor_range)
-    headers = {"x-api-key": instance.admin_api_key, "Accept": "application/json"}
+    headers = build_auth_headers(instance, prefer_panel=True)
     owns_client = client is None
-    request_client = client or httpx.AsyncClient(follow_redirects=True, timeout=timeout_seconds)
+    request_client = client or httpx.AsyncClient(
+        follow_redirects=True, timeout=timeout_seconds
+    )
 
     try:
         try:
@@ -162,7 +232,9 @@ async def fetch_group_health(
         except httpx.TimeoutException as exc:
             raise Sub2APIError("渠道状态 V2 请求超时") from exc
         except httpx.RequestError as exc:
-            raise Sub2APIError("渠道状态 V2 网络请求失败，请检查域名和网络连接") from exc
+            raise Sub2APIError(
+                "渠道状态 V2 网络请求失败，请检查域名和网络连接"
+            ) from exc
 
         if response.status_code in {401, 403}:
             raise Sub2APIError("管理员 API Key 无效或权限不足")
@@ -200,9 +272,58 @@ def build_report(groups: Iterable[Sub2APIGroupRate]) -> MultiplierReport:
 
     minimum = min(group.rate_multiplier for group in ordered)
     minimum_groups = tuple(
-        group for group in ordered if abs(group.rate_multiplier - minimum) <= TIE_EPSILON
+        group
+        for group in ordered
+        if abs(group.rate_multiplier - minimum) <= TIE_EPSILON
     )
     return MultiplierReport(ordered, minimum, minimum_groups)
+
+
+@dataclass(frozen=True)
+class HealthOverview:
+    """Aggregated channel health used by the dashboard header."""
+
+    total: int = 0
+    healthy: int = 0
+    warning: int = 0
+    critical: int = 0
+    unknown: int = 0
+    average_cache_rate: float | None = None
+    total_requests: int = 0
+
+
+def build_health_overview(health_items: Iterable[Sub2APIGroupHealth]) -> HealthOverview:
+    """Count health states and average the trustworthy cache rates."""
+
+    items = tuple(health_items)
+    counts = {"healthy": 0, "warning": 0, "critical": 0, "unknown": 0}
+    cache_rates: list[float] = []
+    total_requests = 0
+
+    for item in items:
+        label = format_health_label(item.overall)
+        key = {"健康": "healthy", "警告": "warning", "异常": "critical"}.get(
+            label, "unknown"
+        )
+        counts[key] += 1
+        total_requests += max(0, item.request_count)
+        if (
+            item.cache_rate is not None
+            and item.cache_rate_denominator >= item.minimum_sample
+            and 0 <= item.cache_rate <= 1
+        ):
+            cache_rates.append(item.cache_rate)
+
+    average = sum(cache_rates) / len(cache_rates) if cache_rates else None
+    return HealthOverview(
+        total=len(items),
+        healthy=counts["healthy"],
+        warning=counts["warning"],
+        critical=counts["critical"],
+        unknown=counts["unknown"],
+        average_cache_rate=average,
+        total_requests=total_requests,
+    )
 
 
 def format_multiplier(value: float) -> str:
@@ -240,13 +361,17 @@ def format_report(
             channel_value = monitor_error
         else:
             channel_label = "渠道"
-            channel_value = _format_channel_status(group_health.overall) if group_health else "无数据"
-        cache_value = _format_cache_rate(group_health)
+            channel_value = (
+                format_health_label(group_health.overall) if group_health else "无数据"
+            )
+        cache_value = format_cache_rate(group_health)
         details = [
             f"- {group.name} | {group.platform}{status_suffix} | 基础倍率：{format_multiplier(group.rate_multiplier)}x"
         ]
         if group.peak_rate_enabled and group.peak_rate_multiplier is not None:
-            details.append(f"高峰倍率：{format_multiplier(group.peak_rate_multiplier)}x")
+            details.append(
+                f"高峰倍率：{format_multiplier(group.peak_rate_multiplier)}x"
+            )
         if group.dynamic_rate_enabled and group.dynamic_rate_markup is not None:
             details.append(f"动态加成：{format_multiplier(group.dynamic_rate_markup)}x")
         details.append(f"{channel_label}：{channel_value}")
@@ -258,7 +383,8 @@ def format_report(
             [
                 "",
                 f"最低基础倍率：{format_multiplier(report.minimum_multiplier)}x",
-                "最低倍率分组：" + "、".join(group.name for group in report.minimum_groups),
+                "最低倍率分组："
+                + "、".join(group.name for group in report.minimum_groups),
             ]
         )
     return "\n".join(lines)
@@ -340,7 +466,9 @@ def _normalize_group(raw: Mapping[str, Any]) -> Sub2APIGroupRate | None:
         return None
 
     group_id = str(raw.get("id") or raw.get("group_id") or "")
-    name = str(raw.get("name") or raw.get("group_name") or group_id or "未命名分组").strip()
+    name = str(
+        raw.get("name") or raw.get("group_name") or group_id or "未命名分组"
+    ).strip()
     platform = str(raw.get("platform") or "unknown").strip()
     peak_multiplier = _to_float(raw.get("peak_rate_multiplier"))
     dynamic_markup = _to_float(raw.get("dynamic_rate_markup"))
@@ -365,7 +493,9 @@ def _is_active_status(status: str) -> bool:
 def _normalize_group_health(raw: Mapping[str, Any]) -> Sub2APIGroupHealth | None:
     metrics = raw.get("metrics") if isinstance(raw.get("metrics"), Mapping) else {}
     health = raw.get("health") if isinstance(raw.get("health"), Mapping) else {}
-    cache_health = health.get("cache") if isinstance(health.get("cache"), Mapping) else {}
+    cache_health = (
+        health.get("cache") if isinstance(health.get("cache"), Mapping) else {}
+    )
 
     group_id = str(raw.get("group_id") or raw.get("id") or "").strip()
     group_name = str(raw.get("group_name") or raw.get("name") or "").strip()
@@ -373,23 +503,29 @@ def _normalize_group_health(raw: Mapping[str, Any]) -> Sub2APIGroupHealth | None
     if not group_id and not group_name:
         return None
 
-    overall = str(health.get("overall") or raw.get("overall") or "unknown").strip().lower()
+    overall = (
+        str(health.get("overall") or raw.get("overall") or "unknown").strip().lower()
+    )
     cache_rate = _to_float(metrics.get("cache_rate"))
     cache_score = _to_float(health.get("cache_score"))
     if cache_score is None:
         cache_score = _to_float(cache_health.get("score"))
     denominator = _to_int(
-        metrics.get("cache_rate_denominator")
-        or raw.get("cache_rate_denominator")
+        metrics.get("cache_rate_denominator") or raw.get("cache_rate_denominator")
     )
-    minimum_sample = _first_int(
-        metrics.get("cache_rate_minimum_sample"),
-        metrics.get("cache_rate_min_samples"),
-        health.get("cache_rate_minimum_sample"),
-        health.get("cache_rate_min_samples"),
-        health.get("minimum_sample"),
-        cache_health.get("minimum_sample"),
-    ) or DEFAULT_CACHE_MINIMUM_SAMPLE
+    minimum_sample = (
+        _first_int(
+            metrics.get("cache_rate_minimum_sample"),
+            metrics.get("cache_rate_min_samples"),
+            health.get("cache_rate_minimum_sample"),
+            health.get("cache_rate_min_samples"),
+            health.get("minimum_sample"),
+            cache_health.get("minimum_sample"),
+        )
+        or DEFAULT_CACHE_MINIMUM_SAMPLE
+    )
+
+    ttft = metrics.get("ttft") if isinstance(metrics.get("ttft"), Mapping) else {}
     return Sub2APIGroupHealth(
         group_id=group_id,
         group_name=group_name,
@@ -399,7 +535,38 @@ def _normalize_group_health(raw: Mapping[str, Any]) -> Sub2APIGroupHealth | None
         cache_score=cache_score,
         cache_rate_denominator=max(0, denominator),
         minimum_sample=max(1, minimum_sample),
+        request_count=max(0, _to_int(metrics.get("request_count"))),
+        error_rate=_to_float(metrics.get("error_rate")),
+        rpm=_to_float(metrics.get("rpm")) or 0.0,
+        ttft_avg_ms=_to_float(ttft.get("avg_ms")),
+        ttft_p95_ms=_to_float(ttft.get("p95_ms")),
+        buckets=_normalize_buckets(raw.get("buckets")),
     )
+
+
+def _normalize_buckets(raw_buckets: Any) -> tuple[Sub2APIGroupBucket, ...]:
+    """Normalize the matrix row's time buckets into render-ready values."""
+
+    if not isinstance(raw_buckets, Sequence) or isinstance(
+        raw_buckets, (str, bytes, bytearray)
+    ):
+        return ()
+
+    buckets: list[Sub2APIGroupBucket] = []
+    for raw in raw_buckets:
+        if not isinstance(raw, Mapping):
+            continue
+        metrics = raw.get("metrics") if isinstance(raw.get("metrics"), Mapping) else {}
+        health = raw.get("health") if isinstance(raw.get("health"), Mapping) else {}
+        buckets.append(
+            Sub2APIGroupBucket(
+                bucket_start=str(raw.get("bucket_start") or "").strip(),
+                request_count=max(0, _to_int(metrics.get("request_count"))),
+                error_rate=_to_float(metrics.get("error_rate")) or 0.0,
+                overall=str(health.get("overall") or "unknown").strip().lower(),
+            )
+        )
+    return tuple(buckets)
 
 
 def _find_group_health(
@@ -419,7 +586,9 @@ def _find_group_health(
     return None
 
 
-def _format_channel_status(overall: str) -> str:
+def format_health_label(overall: str) -> str:
+    """Map a Sub2API HealthState value to its Chinese label."""
+
     normalized = str(overall or "").strip().lower()
     return {
         "healthy": "健康",
@@ -433,7 +602,9 @@ def _format_channel_status(overall: str) -> str:
     }.get(normalized, "无数据")
 
 
-def _format_cache_rate(health: Sub2APIGroupHealth | None) -> str:
+def format_cache_rate(health: Sub2APIGroupHealth | None) -> str:
+    """Render a cache rate, hiding it when the sample is too small to trust."""
+
     if health is None or health.cache_rate is None:
         return "无数据"
     if health.cache_rate_denominator < health.minimum_sample:
@@ -445,7 +616,13 @@ def _format_cache_rate(health: Sub2APIGroupHealth | None) -> str:
 
 def _extract_model_names(group: Mapping[str, Any]) -> list[str]:
     names: list[str] = []
-    for key in ("models", "model_pricing", "models_list_config", "supported_model_scopes", "model_routing"):
+    for key in (
+        "models",
+        "model_pricing",
+        "models_list_config",
+        "supported_model_scopes",
+        "model_routing",
+    ):
         _collect_model_names(group.get(key), names)
     return _unique(names)
 
