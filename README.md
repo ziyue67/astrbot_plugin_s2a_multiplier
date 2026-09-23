@@ -10,6 +10,8 @@
 
 ![Platform](https://img.shields.io/badge/platform-aiocqhttp%20%7C%20QQ-4a90d9)
 
+![License](https://img.shields.io/badge/license-MIT-green)
+
 ![渠道状态图示例](assets/channel-dashboard.png)
 
 *上图为 `/渠道图` 的输出示例（演示数据）。*
@@ -264,4 +266,6 @@ python -m pytest -q
 
 ## 许可
 
-待补充。上游 Sub2API 采用 GNU LGPL v3.0 许可；本插件为独立实现的客户端，可自行选择许可协议。
+本项目采用 [MIT 许可证](LICENSE)。
+
+上游 [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api) 采用 GNU LGPL v3.0，[AstrBot](https://github.com/AstrBotDevs/AstrBot) 采用 GNU AGPL v3.0。本插件是独立实现的客户端，未包含上述项目的源代码。
