@@ -4,7 +4,7 @@
 
 ![AstrBot](https://img.shields.io/badge/AstrBot-%3E%3D%204.10.4-blue)
 
-![Version](https://img.shields.io/badge/version-1.0.2-green)
+![Version](https://img.shields.io/badge/version-1.0.3-green)
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 
@@ -49,21 +49,21 @@
 
 > 插件已提交至 AstrBot 插件市场。若在市场里暂时搜不到，请用下面两种方式安装。
 
-方式二（推荐）：从 [Releases](https://github.com/ziyue67/astrbot_plugin_sub2api_rate/releases) 下载 `astrbot_plugin_sub2api_rate-vX.Y.Z.zip`，在 AstrBot WebUI → 插件页上传安装。
+方式二（推荐）：从 [Releases](https://github.com/ziyue67/astrbot_plugin_sub2api_multiplier/releases) 下载 `astrbot_plugin_sub2api_multiplier-vX.Y.Z.zip`，在 AstrBot WebUI → 插件页上传安装。
 
 方式三：克隆到插件目录。
 
 ```bash
 cd AstrBot/data/plugins
-git clone https://github.com/ziyue67/astrbot_plugin_sub2api_rate.git
-pip install -r astrbot_plugin_sub2api_rate/requirements.txt
+git clone https://github.com/ziyue67/astrbot_plugin_sub2api_multiplier.git
+pip install -r astrbot_plugin_sub2api_multiplier/requirements.txt
 ```
 
 然后重启 AstrBot，在 WebUI → 插件 中确认插件已加载。
 
 ### 安装包结构
 
-Release 里的压缩包带**单一顶层目录** `astrbot_plugin_sub2api_rate/`。手动解压时请保持这个结构——把文件直接摊在 `data/plugins/` 下会导致插件加载失败。CI 会在发布前校验这一点。
+Release 里的压缩包带**单一顶层目录** `astrbot_plugin_sub2api_multiplier/`。手动解压时请保持这个结构——把文件直接摊在 `data/plugins/` 下会导致插件加载失败。CI 会在发布前校验这一点。
 
 ## 配置
 
