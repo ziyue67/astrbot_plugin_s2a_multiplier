@@ -47,7 +47,7 @@
 
 方式一：在 AstrBot 插件市场搜索 `sub2api` 安装。
 
-> 插件已提交至 AstrBot 插件市场，正在审核中（VirusTotal 与安全检查）。审核通过前若搜不到，请用下面两种方式。
+> 插件已提交至 AstrBot 插件市场。若在市场里暂时搜不到，请用下面两种方式安装。
 
 方式二（推荐）：从 [Releases](https://github.com/ziyue67/astrbot_plugin_sub2api_rate/releases) 下载 `astrbot_plugin_sub2api_rate-vX.Y.Z.zip`，在 AstrBot WebUI → 插件页上传安装。
 
